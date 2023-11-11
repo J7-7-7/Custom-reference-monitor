@@ -19,7 +19,7 @@ The file is closed.
 The undo operation will reverse the changes of the last valid writeat operation, making it as if it didn't happen. It's crucial to note that only the most recent operation can be undone. If there haven't been any writeat operations, the undo has no effect. If several writeat operations are consecutively executed, only the changes from the last valid writeat can be undone.
 Aside from the ability to be undone and potentially delayed writes, all writeat operations should behave the same way as they do in the RepyV2 API.
 
-# Three design paradigms are at work in this assignment: accuracy, efficiency, and security.
+# Three design paradigms are at work: accuracy, efficiency, and security.
 
 Accuracy: The defense monitor should precisely and consistently manage file operations. Only specific operations, such as writeat, should have their behavior modified. All situations that are not described above must match that of the underlying API.
 
