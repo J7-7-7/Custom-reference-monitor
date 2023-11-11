@@ -1,0 +1,30 @@
+def thread1():
+    for _ in range(100):
+        myfile.writeat("DATA", 0)
+        sleep(0.0001)
+
+def thread2():
+    for _ in range(100):
+        myfile.undo()
+        sleep(0.0001)
+
+# Clean up if the file exists.
+if "testfile.txt" in listfiles():
+    removefile("testfile.txt")
+
+myfile = openfile("testfile.txt", True)
+
+# Launch the threads
+createthread(thread1)
+createthread(thread2)
+
+# Allow threads to execute
+sleep(0.5)
+
+# Check the content
+content = myfile.readat(None, 0)
+if content == "DATA":
+    log("Hacked! File content is not as expected: " + content)
+
+myfile.close()
+

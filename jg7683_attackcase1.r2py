@@ -1,0 +1,33 @@
+def thread1():
+    for _ in range(100):
+        myfile.writeat("AAAA", 0)
+
+def thread2():
+    for _ in range(100):
+        myfile.writeat("BBBB", 0)
+
+def thread3():
+    for _ in range(200):  
+        myfile.undo()
+
+if "testfile.txt" in listfiles():
+    removefile("testfile.txt")
+
+myfile = openfile("testfile.txt", True)
+
+createthread(thread1)
+sleep(0.0001)  
+createthread(thread2)
+sleep(0.0001)  
+createthread(thread3)
+
+
+sleep(0.5)
+
+
+content = myfile.readat(None, 0)
+myfile.close()
+
+
+if content not in ["AAAA", "BBBB", ""]:
+    log("Hacked! Inconsistent file content due to lack of locks!")

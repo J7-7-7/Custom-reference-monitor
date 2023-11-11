@@ -1,0 +1,117 @@
+"""
+This security layer inadequately handles the undo functionality
+
+Note:
+    This security layer uses encasementlib.r2py, restrictions.default, repy.py and Python
+    Also you need to give it an application to run.
+    python repy.py restrictions.default encasementlib.r2py [security_layer].r2py [attack_program].r2py 
+    
+"""
+
+TYPE = "type"
+ARGS = "args"
+RETURN = "return"
+EXCP = "exceptions"
+TARGET = "target"
+FUNC = "func"
+OBJC = "objc"
+
+class LPFile():
+    def __init__(self, filename, create):
+        mycontext['debug'] = False
+        self.mutex = createlock()
+        self.mutex.acquire(True)
+        try:
+            self.LPfile = openfile(filename, create)
+            self.pending_data = None
+            self.pending_offset = None
+            self.previous_data = None
+            self.previous_offset = None
+            self.initial_content = self.LPfile.readat(None, 0)
+            self._is_closed = False
+        finally:
+            self.mutex.release()
+
+    def readat(self, bytes, offset):
+        self.mutex.acquire(True)
+        try:
+            return self.LPfile.readat(bytes, offset)
+        finally:
+            self.mutex.release()
+
+    def writeat(self, data, offset):
+        self.mutex.acquire(True)
+        try:
+            if offset < 0:
+                raise RepyArgumentError()
+            if not isinstance(data, str):
+                raise RepyArgumentError()
+            if self._is_closed:
+                raise FileClosedError()
+            
+            
+            if self.pending_data is not None:
+                self.previous_data = self.pending_data
+                self.previous_offset = self.pending_offset
+                self.LPfile.writeat(self.pending_data, self.pending_offset)
+                self.initial_content = self.initial_content[:self.pending_offset] + self.pending_data + self.initial_content[self.pending_offset + len(self.pending_data):]
+            
+            if offset > len(self.initial_content):  
+                raise SeekPastEndOfFileError()
+
+            self.pending_data = data
+            self.pending_offset = offset
+        finally:
+            self.mutex.release()
+
+    def undo(self):
+        self.mutex.acquire(True)
+        try:
+            if self._is_closed:
+                return
+
+            if self.pending_data is not None:
+                self.pending_data = None
+                self.pending_offset = None
+                return
+
+            if self.previous_data is not None:
+                self.LPfile.writeat(self.previous_data, self.previous_offset)
+                self.initial_content = self.initial_content[:self.previous_offset] + self.previous_data + self.initial_content[self.previous_offset + len(self.previous_data):]
+                self.previous_data = None
+                self.previous_offset = None
+        finally:
+            self.mutex.release()
+
+    def close(self):
+        self.mutex.acquire(True)
+        try:
+            if self.pending_data:
+                self.LPfile.writeat(self.pending_data, self.pending_offset)
+            self.LPfile.close()
+            self._is_closed = True
+        finally:
+            self.mutex.release()
+
+def LPopenfile(filename, create):
+    return LPFile(filename, create)
+
+sec_file_def = {
+    "obj-type": LPFile,
+    "name": "LPFile",
+    "writeat": {"type": "func", "args": (str, (int, long)), "exceptions": Exception, "return": (int, type(None)), "target": LPFile.writeat},
+    "readat": {"type": "func", "args": ((int, long, type(None)), (int, long)), "exceptions": Exception, "return": str, "target": LPFile.readat},
+    "undo": {"type": "func", "args": None, "exceptions": None, "return": type(None), "target": LPFile.undo},
+    "close": {"type": "func", "args": None, "exceptions": Exception, "return": (bool, type(None)), "target": LPFile.close}
+}
+
+CHILD_CONTEXT_DEF["openfile"] = {
+    TYPE: OBJC,
+    ARGS: (str, bool),
+    EXCP: Exception,
+    RETURN: sec_file_def,
+    TARGET: LPopenfile
+}
+
+# Execute the user code
+secure_dispatch_module()
